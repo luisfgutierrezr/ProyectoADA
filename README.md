@@ -1,6 +1,6 @@
 # TSP Routing System - Traveling Salesman on Road Networks
 
-Este proyecto es una implementación de prueba de concepto para resolver el **Problema del Viajante (TSP)** sobre una red vial utilizando diferentes enfoques algorítmicos. Forma parte del proyecto final del curso **Análisis de Algoritmos**.
+Este proyecto es una implementación de prueba de concepto para resolver el **Problema del Viajante (TSP)** sobre una red vial utilizando diferentes enfoques algorítmicos. Forma parte del proyecto final del curso **Análisis de Algoritmos**, hecho por Diego Martinez, Eugenia Dayoub, Gabriela Rojas y Luis Gutiérrez.
 
 ---
 
