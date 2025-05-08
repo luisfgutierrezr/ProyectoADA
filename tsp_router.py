@@ -99,14 +99,22 @@ class TSPRouter:
             "cost": cost,
             "time": round(end - start, 4)
         }
-
-    def two_opt(self, initial_path: List[str]) -> Dict[str, Any]:
+    
+        
+    def _route_cost(self, route: List[str]) -> float:
         """
+        Calcula el costo total de una ruta completa.
+        Suma las distancias entre cada par consecutivo de nodos.
+        """
+        return sum(self.distance(route[i], route[i+1]) for i in range(len(route) - 1))
+
+"""     def two_opt(self, initial_path: List[str]) -> Dict[str, Any]:
+        
         Mejora una solución inicial al TSP usando el algoritmo de 2-opt.
         Intercambia segmentos de la ruta si reduce el costo total.
-        """
+        
         def two_opt_swap(route: List[str], i: int, k: int) -> List[str]:
-            """Invierte una sección del recorrido entre los índices i y k."""
+            Invierte una sección del recorrido entre los índices i y k
             return route[:i] + route[i:k+1][::-1] + route[k+1:]
 
         start = time.time()
@@ -134,11 +142,5 @@ class TSPRouter:
             "path": path,
             "cost": self._route_cost(path),
             "time": round(end - start, 4)
-        }
+        } """
 
-    def _route_cost(self, route: List[str]) -> float:
-        """
-        Calcula el costo total de una ruta completa.
-        Suma las distancias entre cada par consecutivo de nodos.
-        """
-        return sum(self.distance(route[i], route[i+1]) for i in range(len(route) - 1))
