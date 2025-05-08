@@ -10,7 +10,7 @@ La solución permite:
 - Calcular rutas óptimas usando tres algoritmos distintos:
   1. **Fuerza Bruta (Brute Force)**
   2. **Vecino Más Cercano (Nearest Neighbor)**
-  3. **2-opt (Mejora local sobre una heurística inicial)**
+  3. **En proceso**
 
 ## ⚙️ Tecnologías utilizadas
 
@@ -18,7 +18,6 @@ La solución permite:
 - `networkx` – manejo de grafos
 - `numpy` – soporte matemático
 - `itertools` y `time` – para permutaciones y mediciones de tiempo
-- `FastAPI` – API REST
 - `Leaflet.js` – visualización de mapas
 
 ## Instalación
@@ -44,15 +43,13 @@ La solución permite:
 
 ```
 ProyectoADA/
-├── main.py               # Servidor FastAPI
+├── main.py               # Servidor con API para Backend
 ├── tsp_router.py         # Clase principal con lógica TSP
 ├── static/              # Archivos frontend
 │   ├── index.html      # Interfaz web
 │   └── app.js          # Lógica frontend
 ├── data/               # Archivos de prueba
 │   └── example.json    # Ejemplo de grafo y puntos
-├── tests/              # Pruebas unitarias
-│   └── test_tsp_router.py
 ├── README.md
 └── requirements.txt
 ```
