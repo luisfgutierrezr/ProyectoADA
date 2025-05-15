@@ -69,36 +69,52 @@ class TSPRouter:
 
     def nearest_neighbor(self, start_node: str = None) -> Dict[str, Any]:
         """
-        Algoritmo del vecino más cercano (heurístico).
-        Comienza en un punto y siempre elige el nodo no visitado más cercano.
+        Resuelve el TSP usando el algoritmo del vecino más cercano.
+        Comienza desde un nodo inicial y siempre se mueve al nodo más cercano no visitado.
         """
-        start = time.time()
-        unvisited = set(self.points)             # Conjunto de nodos aún no visitados
-        if not start_node:
-            start_node = self.points[0]          # Usa el primero como punto de inicio si no se da otro
-        path = [start_node]                      # Ruta inicial con el punto de partida
-        unvisited.remove(start_node)
+        start = time.time()  # Iniciar conteo de tiempo para medir rendimiento
 
-        # Recorre el grafo eligiendo siempre el nodo no visitado más cercano
+        # Si no se especifica nodo inicial, se toma el primero de la lista de puntos
+        if not start_node:
+            start_node = self.points[0]
+
+        current_node = start_node  # Nodo desde el que se comienza el recorrido
+
+        # Crear conjunto con los puntos no visitados (se eliminan a medida que se recorren)
+        unvisited = set(self.points)
+        unvisited.remove(current_node)  # Quitamos el nodo inicial porque ya lo estamos visitando
+
+        path = [current_node]  # Lista para guardar la ruta en orden de visita
+
+        # Repetir hasta que se hayan visitado todos los puntos
         while unvisited:
-            last = path[-1]
-            next_node = min(unvisited, key=lambda x: self.distance(last, x))
+            # Encontrar el nodo más cercano al nodo actual (según distancia más corta en el grafo)
+            next_node = min(unvisited, key=lambda node: self.distance(current_node, node))
+
+            # Agregar el nodo más cercano a la ruta
             path.append(next_node)
+
+            # Eliminar el nodo recién visitado del conjunto de no visitados
             unvisited.remove(next_node)
 
-        # Regresa al nodo de inicio para cerrar el ciclo
+            # Actualizar el nodo actual al nuevo nodo visitado (simulando el movimiento)
+            current_node = next_node
+
+        # Al finalizar, cerrar el ciclo regresando al punto de partida
         path.append(start_node)
 
-        # Calcula el costo total de la ruta
+        # Calcular el costo total del recorrido (suma de distancias entre nodos consecutivos)
         cost = sum(self.distance(path[i], path[i+1]) for i in range(len(path) - 1))
-        end = time.time()
+
+        end = time.time()  # Terminar conteo de tiempo
 
         return {
             "algorithm": "Nearest Neighbor",
-            "path": path,
-            "cost": cost,
-            "time": round(end - start, 4)
+            "path": path,                     # Ruta seguida
+            "cost": cost,                     # Costo total (distancia)
+            "time": round(end - start, 4)     # Tiempo de ejecución en segundos
         }
+
     
         
     def _route_cost(self, route: List[str]) -> float:
