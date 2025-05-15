@@ -15,25 +15,29 @@ class TSPRouter:
         self.graph = nx.Graph()  # Grafo que almacena nodos y aristas
         self.points = []         # Lista de nodos que representan los puntos a visitar
 
-    def load_graph(self, edges: List[Tuple[str, str, float]]) -> None:
+    def load_graph(self, edges: List[Tuple[int, int, float]]) -> None:
         """
         Carga un grafo a partir de una lista de aristas.
         Cada arista es una tupla: (nodo1, nodo2, peso)
         """
         self.graph.add_weighted_edges_from(edges)
 
-    def set_points(self, points: List[str]) -> None:
+    def set_points(self, points: List[int]) -> None:
         """
         Establece la lista de puntos que se deben visitar.
         """
         self.points = points
 
-    def distance(self, u: str, v: str) -> float:
+    def distance(self, u: int, v: int) -> float:
         """
         Calcula la distancia más corta entre dos nodos en el grafo,
         utilizando el peso de las aristas (e.g., distancia real o tiempo).
         """
-        return nx.shortest_path_length(self.graph, u, v, weight='weight')
+        try:
+            return nx.shortest_path_length(self.graph, u, v, weight='length')
+        except nx.NetworkXNoPath:
+            print(f"Warning: No path found between nodes {u} and {v}")
+            return float('inf')
 
     def brute_force_tsp(self) -> Dict[str, Any]:
         """
@@ -67,7 +71,7 @@ class TSPRouter:
             "time": round(end - start, 4)  # Tiempo de ejecución
         }
 
-    def nearest_neighbor(self, start_node: str = None) -> Dict[str, Any]:
+    def nearest_neighbor(self, start_node: int = None) -> Dict[str, Any]:
         """
         Resuelve el TSP usando el algoritmo del vecino más cercano.
         Comienza desde un nodo inicial y siempre se mueve al nodo más cercano no visitado.
@@ -78,6 +82,9 @@ class TSPRouter:
         if not start_node:
             start_node = self.points[0]
 
+        print(f"\nStarting nearest neighbor algorithm from node {start_node}")
+        print(f"Total points to visit: {len(self.points)}")
+
         current_node = start_node  # Nodo desde el que se comienza el recorrido
 
         # Crear conjunto con los puntos no visitados (se eliminan a medida que se recorren)
@@ -85,20 +92,38 @@ class TSPRouter:
         unvisited.remove(current_node)  # Quitamos el nodo inicial porque ya lo estamos visitando
 
         path = [current_node]  # Lista para guardar la ruta en orden de visita
+        iteration = 0
+        max_iterations = len(self.points) * 2  # Safety check to prevent infinite loops
 
         # Repetir hasta que se hayan visitado todos los puntos
-        while unvisited:
+        while unvisited and iteration < max_iterations:
+            iteration += 1
+            print(f"\nIteration {iteration}:")
+            print(f"Current node: {current_node}")
+            print(f"Unvisited nodes remaining: {len(unvisited)}")
+
             # Encontrar el nodo más cercano al nodo actual (según distancia más corta en el grafo)
-            next_node = min(unvisited, key=lambda node: self.distance(current_node, node))
+            try:
+                next_node = min(unvisited, key=lambda node: self.distance(current_node, node))
+                dist = self.distance(current_node, next_node)
+                print(f"Found next node: {next_node} at distance {dist}")
 
-            # Agregar el nodo más cercano a la ruta
-            path.append(next_node)
+                # Agregar el nodo más cercano a la ruta
+                path.append(next_node)
 
-            # Eliminar el nodo recién visitado del conjunto de no visitados
-            unvisited.remove(next_node)
+                # Eliminar el nodo recién visitado del conjunto de no visitados
+                unvisited.remove(next_node)
 
-            # Actualizar el nodo actual al nuevo nodo visitado (simulando el movimiento)
-            current_node = next_node
+                # Actualizar el nodo actual al nuevo nodo visitado (simulando el movimiento)
+                current_node = next_node
+            except ValueError as e:
+                print(f"Error finding next node: {e}")
+                print("Current unvisited nodes:", unvisited)
+                print("Current node:", current_node)
+                break
+
+        if iteration >= max_iterations:
+            print("Warning: Maximum iterations reached, algorithm may not have completed")
 
         # Al finalizar, cerrar el ciclo regresando al punto de partida
         path.append(start_node)
@@ -108,6 +133,11 @@ class TSPRouter:
 
         end = time.time()  # Terminar conteo de tiempo
 
+        print(f"\nAlgorithm completed:")
+        print(f"Path length: {len(path)}")
+        print(f"Total cost: {cost}")
+        print(f"Time taken: {round(end - start, 4)} seconds")
+
         return {
             "algorithm": "Nearest Neighbor",
             "path": path,                     # Ruta seguida
@@ -115,9 +145,7 @@ class TSPRouter:
             "time": round(end - start, 4)     # Tiempo de ejecución en segundos
         }
 
-    
-        
-    def _route_cost(self, route: List[str]) -> float:
+    def _route_cost(self, route: List[int]) -> float:
         """
         Calcula el costo total de una ruta completa.
         Suma las distancias entre cada par consecutivo de nodos.
