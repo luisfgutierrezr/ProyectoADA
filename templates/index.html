@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSP Router</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        
+        #map {
+            height: 600px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .path-info {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TSP Router</h1>
+    
+    <div class="controls">
+        <label for="networkFile">Network File (.csv, .osm):</label>
+        <input type="file" id="networkFile" accept=".csv,.osm" title="Select network file" />
+        <button onclick="uploadNetwork()">Upload Network</button>
+        
+        <label for="pointsFile">Points File (.csv, .tsv):</label>
+        <input type="file" id="pointsFile" accept=".csv,.tsv" title="Select points file" />
+        <button onclick="uploadPoints()">Upload Points</button>
+        
+        <button onclick="runAlgorithms()" id="runButton" disabled>Run Algorithms</button>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div class="results" id="results" style="display: none;">
+        <h2>Results</h2>
+        <div id="bruteForce" class="path-info"></div>
+        <div id="nearestNeighbor" class="path-info"></div>
+        <div id="genetic" class="path-info"></div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([4.6097, -74.0817], 13); // Bogotá coordinates
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Store layers
+        let networkLayer = null;
+        let pointsLayer = null;
+        let pathLayers = {
+            bruteForce: null,
+            nearestNeighbor: null,
+            genetic: null
+        };
+        
+        // Upload network file
+        async function uploadNetwork() {
+            const fileInput = document.getElementById('networkFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a network file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/upload/network', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    alert('Network loaded successfully');
+                    // Enable run button if points are also loaded
+                    document.getElementById('runButton').disabled = !document.getElementById('pointsFile').files[0];
+                } else {
+                    alert('Error: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error uploading network: ' + error);
+            }
+        }
+        
+        // Upload points file
+        async function uploadPoints() {
+            const fileInput = document.getElementById('pointsFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a points file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/upload/points', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    alert('Points loaded successfully');
+                    // Enable run button if network is also loaded
+                    document.getElementById('runButton').disabled = !document.getElementById('networkFile').files[0];
+                } else {
+                    alert('Error: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error uploading points: ' + error);
+            }
+        }
+        
+        // Run algorithms
+        async function runAlgorithms() {
+            try {
+                const response = await fetch('/run-algorithms', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error running algorithms: ' + error);
+            }
+        }
+        
+        // Display results
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            
+            // Display brute force results
+            const bruteForceDiv = document.getElementById('bruteForce');
+            bruteForceDiv.innerHTML = `
+                <h3>Brute Force</h3>
+                <p>Distance: ${results.brute_force.distance.toFixed(2)}</p>
+                <p>Time: ${results.brute_force.time.toFixed(2)} seconds</p>
+            `;
+            
+            // Display nearest neighbor results
+            const nearestNeighborDiv = document.getElementById('nearestNeighbor');
+            nearestNeighborDiv.innerHTML = `
+                <h3>Nearest Neighbor</h3>
+                <p>Distance: ${results.nearest_neighbor.distance.toFixed(2)}</p>
+                <p>Time: ${results.nearest_neighbor.time.toFixed(2)} seconds</p>
+            `;
+            
+            // Display genetic algorithm results
+            const geneticDiv = document.getElementById('genetic');
+            geneticDiv.innerHTML = `
+                <h3>Genetic Algorithm</h3>
+                <p>Distance: ${results.genetic.distance.toFixed(2)}</p>
+                <p>Time: ${results.genetic.time.toFixed(2)} seconds</p>
+            `;
+            
+            // Draw paths on map
+            drawPaths(results);
+        }
+        
+        // Draw paths on map
+        function drawPaths(results) {
+            // Clear existing path layers
+            Object.values(pathLayers).forEach(layer => {
+                if (layer) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Draw new paths
+            const colors = {
+                brute_force: 'red',
+                nearest_neighbor: 'blue',
+                genetic: 'green'
+            };
+            
+            for (const [algorithm, result] of Object.entries(results)) {
+                const path = result.path.map(index => [points[index].latitude, points[index].longitude]);
+                pathLayers[algorithm] = L.polyline(path, {
+                    color: colors[algorithm],
+                    weight: 3,
+                    opacity: 0.7
+                }).addTo(map);
+            }
+        }
+    </script>
+</body>
+</html> 

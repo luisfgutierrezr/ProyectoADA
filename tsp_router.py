@@ -152,6 +152,75 @@ class TSPRouter:
         """
         return sum(self.distance(route[i], route[i+1]) for i in range(len(route) - 1))
 
+    def genetic_algorithm_tsp(self, population_size=50, generations=100, mutation_rate=0.1) -> Dict[str, Any]:
+        """
+        Resuelve el TSP usando un algoritmo genético.
+        population_size: número de rutas en cada generación
+        generations: número de generaciones
+        mutation_rate: probabilidad de mutación por individuo
+        """
+        import random
+        import time
+        start = time.time()
+        points = self.points
+        n = len(points)
+        if n < 2:
+            return {"algorithm": "Genetic Algorithm", "path": points, "cost": 0, "time": 0}
+
+        # Inicializar población con permutaciones aleatorias
+        population = [random.sample(points, n) for _ in range(population_size)]
+
+        def fitness(route):
+            return self._route_cost(route + [route[0]])
+
+        def crossover(parent1, parent2):
+            # Order crossover (OX)
+            a, b = sorted(random.sample(range(n), 2))
+            child = [None]*n
+            child[a:b] = parent1[a:b]
+            fill = [item for item in parent2 if item not in child]
+            idx = 0
+            for i in range(n):
+                if child[i] is None:
+                    child[i] = fill[idx]
+                    idx += 1
+            return child
+
+        def mutate(route):
+            i, j = random.sample(range(n), 2)
+            route[i], route[j] = route[j], route[i]
+            return route
+
+        for _ in range(generations):
+            # Evaluar fitness
+            scored = [(fitness(route), route) for route in population]
+            scored.sort(key=lambda x: x[0])
+            population = [route for _, route in scored]
+            # Elitismo: mantener los mejores
+            new_population = population[:2]
+            # Rellenar el resto
+            while len(new_population) < population_size:
+                # Selección por torneo
+                contenders = random.sample(population, 5)
+                parent1 = min(contenders, key=fitness)
+                parent2 = min(random.sample(population, 5), key=fitness)
+                child = crossover(parent1, parent2)
+                if random.random() < mutation_rate:
+                    child = mutate(child)
+                new_population.append(child)
+            population = new_population
+
+        # Mejor individuo final
+        best_route = min(population, key=lambda r: fitness(r))
+        best_cost = fitness(best_route)
+        end = time.time()
+        return {
+            "algorithm": "Genetic Algorithm",
+            "path": best_route + [best_route[0]],
+            "cost": best_cost,
+            "time": round(end - start, 4)
+        }
+
 """     def two_opt(self, initial_path: List[str]) -> Dict[str, Any]:
         
         Mejora una solución inicial al TSP usando el algoritmo de 2-opt.
