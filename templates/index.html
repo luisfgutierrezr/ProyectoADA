@@ -4,37 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TSP Router</title>
-    
-    <!-- Custom CSS -->
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body {
             margin: 0;
             padding: 20px;
             font-family: Arial, sans-serif;
         }
-        
-        .map-container {
-            position: relative;
-            width: 100%;
+        #map {
             height: 600px;
+            width: 100%;
             margin-bottom: 20px;
-            overflow: hidden;
         }
-        
-        #baseMap {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
-        #routeCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        
         .controls {
             margin-bottom: 20px;
             padding: 15px;
@@ -45,14 +27,12 @@
             gap: 10px;
             align-items: center;
         }
-        
         .results {
             margin-top: 20px;
             padding: 15px;
             background-color: #f5f5f5;
             border-radius: 5px;
         }
-        
         button {
             padding: 8px 15px;
             margin: 5px;
@@ -62,16 +42,13 @@
             border-radius: 4px;
             cursor: pointer;
         }
-        
         button:hover {
             background-color: #45a049;
         }
-        
         button:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        
         .path-info {
             margin: 10px 0;
             padding: 10px;
@@ -81,20 +58,17 @@
             align-items: center;
             gap: 10px;
         }
-
         .file-input-group {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-
         .route-controls {
             display: flex;
             flex-direction: column;
             gap: 5px;
             margin-top: 10px;
         }
-
         .route-control {
             display: flex;
             align-items: center;
@@ -104,38 +78,30 @@
 </head>
 <body>
     <h1>TSP Router</h1>
-    
     <div class="controls">
         <div class="file-input-group">
             <label for="networkFile">Network File (.osm):</label>
             <input type="file" id="networkFile" accept=".osm" title="Select network file" />
             <button onclick="uploadNetwork()">Upload Network</button>
         </div>
-        
         <div class="file-input-group">
             <label for="pointsFile">Points File (.tsv):</label>
             <input type="file" id="pointsFile" accept=".tsv" title="Select points file" />
             <button onclick="uploadPoints()">Upload Points</button>
         </div>
-        
         <button onclick="runAlgorithms()" id="runButton" disabled>Run Algorithms</button>
     </div>
-    
-    <div class="map-container">
-        <img id="baseMap" src="/static/points.jpeg" alt="Base Map">
-        <canvas id="routeCanvas"></canvas>
-    </div>
-    
+    <div id="map"></div>
     <div class="results" id="results" style="display: none;">
         <h2>Results</h2>
         <div class="route-controls">
             <div class="route-control">
-                <input type="checkbox" id="bruteForceToggle" checked onchange="toggleRoute('bruteForce')">
-                <label for="bruteForceToggle">Brute Force Route</label>
+                <input type="checkbox" id="brute_forceToggle" checked onchange="toggleRoute('brute_force')">
+                <label for="brute_forceToggle">Brute Force Route</label>
             </div>
             <div class="route-control">
-                <input type="checkbox" id="nearestNeighborToggle" checked onchange="toggleRoute('nearestNeighbor')">
-                <label for="nearestNeighborToggle">Nearest Neighbor Route</label>
+                <input type="checkbox" id="nearest_neighborToggle" checked onchange="toggleRoute('nearest_neighbor')">
+                <label for="nearest_neighborToggle">Nearest Neighbor Route</label>
             </div>
             <div class="route-control">
                 <input type="checkbox" id="geneticToggle" checked onchange="toggleRoute('genetic')">
@@ -146,40 +112,30 @@
         <div id="nearestNeighbor" class="path-info"></div>
         <div id="genetic" class="path-info"></div>
     </div>
-    
-    <!-- Custom JS -->
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Canvas setup
-        const canvas = document.getElementById('routeCanvas');
-        const ctx = canvas.getContext('2d');
-        const baseMap = document.getElementById('baseMap');
-        
-        // Store routes
-        let routes = {
-            bruteForce: null,
-            nearestNeighbor: null,
+        // Initialize map (centered on Chapinero by default)
+        const map = L.map('map').setView([4.6467, -74.0628], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        // Store marker and route layers
+        let pointMarkers = [];
+        let routeLayers = {
+            brute_force: null,
+            nearest_neighbor: null,
             genetic: null
         };
-        
         // Colors for different algorithms
         const colors = {
             brute_force: 'red',
             nearest_neighbor: 'blue',
             genetic: 'green'
         };
-        
-        // Guardar bounds globalmente
-        let geoBounds = null;
-        
         // Store original points from .tsv upload
         let originalPoints = [];
-        
-        // Resize canvas when image loads
-        baseMap.onload = function() {
-            canvas.width = baseMap.width;
-            canvas.height = baseMap.height;
-        };
-        
         // Upload network file
         async function uploadNetwork() {
             const fileInput = document.getElementById('networkFile');
@@ -188,22 +144,17 @@
                 alert('Please select a network file');
                 return;
             }
-            
             const formData = new FormData();
             formData.append('file', file);
-            
             try {
                 const response = await fetch('/upload/network', {
                     method: 'POST',
                     body: formData
                 });
-                
                 const data = await response.json();
                 if (response.ok) {
                     alert('Network loaded successfully');
                     document.getElementById('runButton').disabled = !document.getElementById('pointsFile').files[0];
-                    // Guardar bounds geográficos
-                    geoBounds = data.bounds;
                 } else {
                     alert('Error: ' + data.detail);
                 }
@@ -211,7 +162,6 @@
                 alert('Error uploading network: ' + error);
             }
         }
-        
         // Upload points file
         async function uploadPoints() {
             const fileInput = document.getElementById('pointsFile');
@@ -220,23 +170,20 @@
                 alert('Please select a points file');
                 return;
             }
-            
             const formData = new FormData();
             formData.append('file', file);
-            
             try {
                 const response = await fetch('/upload/points', {
                     method: 'POST',
                     body: formData
                 });
-                
                 const data = await response.json();
                 if (response.ok) {
                     alert('Points loaded successfully');
                     document.getElementById('runButton').disabled = !document.getElementById('networkFile').files[0];
                     // Store original points for route drawing
                     originalPoints = data.coordinates.map(pt => ({ latitude: pt.latitude, longitude: pt.longitude }));
-                    drawAll();
+                    drawPoints();
                 } else {
                     alert('Error: ' + data.detail);
                 }
@@ -244,14 +191,34 @@
                 alert('Error uploading points: ' + error);
             }
         }
-        
+        // Draw points as Leaflet markers
+        function drawPoints() {
+            // Remove old markers
+            pointMarkers.forEach(m => map.removeLayer(m));
+            pointMarkers = [];
+            // Add new markers
+            for (const pt of originalPoints) {
+                const marker = L.circleMarker([pt.latitude, pt.longitude], {
+                    radius: 7,
+                    color: 'red',
+                    fillColor: 'red',
+                    fillOpacity: 0.8,
+                    weight: 2
+                }).addTo(map);
+                pointMarkers.push(marker);
+            }
+            // Optionally fit map to points
+            if (originalPoints.length > 0) {
+                const latlngs = originalPoints.map(pt => [pt.latitude, pt.longitude]);
+                map.fitBounds(latlngs);
+            }
+        }
         // Run algorithms
         async function runAlgorithms() {
             try {
                 const response = await fetch('/run-algorithms', {
                     method: 'POST'
                 });
-                
                 const data = await response.json();
                 if (response.ok) {
                     displayResults(data);
@@ -262,83 +229,43 @@
                 alert('Error running algorithms: ' + error);
             }
         }
-        
-        // Draw only the routes and arrows using original points
-        function drawAll(results = null) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Draw routes if there are results
-            if (results) {
-                for (const [algorithm, result] of Object.entries(results)) {
-                    if (result.error) continue;
-                    const indices = result.point_indices;
-                    if (!indices || indices.length < 2) continue;
-                    // Build coordinates array from originalPoints using indices
-                    const coordinates = indices.map(idx => originalPoints[idx]).filter(Boolean);
-                    routes[algorithm] = coordinates;
-                    const isVisible = document.getElementById(algorithm + 'Toggle')?.checked;
-                    if (isVisible) {
-                        drawRoute(coordinates, colors[algorithm]);
-                    }
+        // Draw routes as Leaflet polylines
+        function drawRoutes(results) {
+            // Remove old route layers
+            Object.values(routeLayers).forEach(layer => {
+                if (layer) map.removeLayer(layer);
+            });
+            // Draw new routes
+            for (const [algorithm, result] of Object.entries(results)) {
+                if (result.error) continue;
+                const indices = result.point_indices;
+                if (!indices || indices.length < 2) continue;
+                const latlngs = indices.map(idx => [originalPoints[idx].latitude, originalPoints[idx].longitude]);
+                const color = colors[algorithm] || 'black';
+                const polyline = L.polyline(latlngs, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8
+                });
+                const checkbox = document.getElementById(algorithm + 'Toggle');
+                if (!checkbox || checkbox.checked) {
+                    polyline.addTo(map);
                 }
-            } else {
-                // If no new results, draw currently visible routes
-                for (const [algo, coords] of Object.entries(routes)) {
-                    const isVisible = document.getElementById(algo + 'Toggle')?.checked;
-                    if (coords && isVisible) {
-                        drawRoute(coords, colors[algo]);
-                    }
-                }
+                routeLayers[algorithm] = polyline;
             }
         }
-        
-        // Map geo coordinates to pixel coordinates
-        function geoToPixel(lat, lon, bounds, imgWidth, imgHeight) {
-            const x = ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * imgWidth;
-            const y = imgHeight - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * imgHeight;
-            return { x, y };
-        }
-        
-        // Draw a single route (polyline + arrows)
-        function drawRoute(coordinates, color) {
-            if (!geoBounds) return;
-            ctx.beginPath();
-            const start = geoToPixel(coordinates[0].latitude, coordinates[0].longitude, geoBounds, canvas.width, canvas.height);
-            ctx.moveTo(start.x, start.y);
-            for (let i = 1; i < coordinates.length; i++) {
-                const pt = geoToPixel(coordinates[i].latitude, coordinates[i].longitude, geoBounds, canvas.width, canvas.height);
-                ctx.lineTo(pt.x, pt.y);
-            }
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            // Draw arrows at the end of each segment
-            for (let i = 0; i < coordinates.length - 1; i++) {
-                const a = geoToPixel(coordinates[i].latitude, coordinates[i].longitude, geoBounds, canvas.width, canvas.height);
-                const b = geoToPixel(coordinates[i+1].latitude, coordinates[i+1].longitude, geoBounds, canvas.width, canvas.height);
-                drawArrow(a.x, a.y, b.x, b.y, color);
-            }
-        }
-        
-        // Draw an arrow
-        function drawArrow(fromX, fromY, toX, toY, color) {
-            const headLength = 15;
-            const angle = Math.atan2(toY - fromY, toX - fromX);
-            
-            ctx.beginPath();
-            ctx.moveTo(toX, toY);
-            ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
-            ctx.closePath();
-            
-            ctx.fillStyle = color;
-            ctx.fill();
-        }
-        
         // Toggle route visibility
         function toggleRoute(algorithm) {
-            drawAll();
+            const checkbox = document.getElementById(algorithm + 'Toggle');
+            const layer = routeLayers[algorithm];
+            if (layer) {
+                if (checkbox.checked) {
+                    map.addLayer(layer);
+                } else {
+                    map.removeLayer(layer);
+                }
+            }
         }
-        
         // Display results
         function displayResults(results) {
             const resultsDiv = document.getElementById('results');
@@ -364,8 +291,7 @@
                 <p>Distance: ${results.genetic.distance.toFixed(2)} meters</p>
                 <p>Time: ${results.genetic.time.toFixed(2)} seconds</p>
             `;
-            // Draw everything
-            drawAll(results);
+            drawRoutes(results);
         }
     </script>
 </body>
