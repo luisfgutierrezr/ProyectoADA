@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSP Router</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 600px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .path-info {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .route-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .route-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TSP Router</h1>
+    <div class="controls">
+        <div class="file-input-group">
+            <label for="networkFile">Network File (.osm):</label>
+            <input type="file" id="networkFile" accept=".osm" title="Select network file" />
+            <button onclick="uploadNetwork()">Upload Network</button>
+        </div>
+        <div class="file-input-group">
+            <label for="pointsFile">Points File (.tsv):</label>
+            <input type="file" id="pointsFile" accept=".tsv" title="Select points file" />
+            <button onclick="uploadPoints()">Upload Points</button>
+        </div>
+        <button onclick="runAlgorithms()" id="runButton" disabled>Run Algorithms</button>
+    </div>
+    <div id="map"></div>
+    <div class="results" id="results" style="display: none;">
+        <h2>Results</h2>
+        <div class="route-controls">
+            <div class="route-control">
+                <input type="checkbox" id="brute_forceToggle" checked onchange="toggleRoute('brute_force')">
+                <label for="brute_forceToggle">Brute Force Route</label>
+            </div>
+            <div class="route-control">
+                <input type="checkbox" id="nearest_neighborToggle" checked onchange="toggleRoute('nearest_neighbor')">
+                <label for="nearest_neighborToggle">Nearest Neighbor Route</label>
+            </div>
+            <div class="route-control">
+                <input type="checkbox" id="geneticToggle" checked onchange="toggleRoute('genetic')">
+                <label for="geneticToggle">Genetic Algorithm Route</label>
+            </div>
+        </div>
+        <div id="bruteForce" class="path-info"></div>
+        <div id="nearestNeighbor" class="path-info"></div>
+        <div id="genetic" class="path-info"></div>
+    </div>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map (centered on Chapinero by default)
+        const map = L.map('map').setView([4.6467, -74.0628], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        // Store marker and route layers
+        let pointMarkers = [];
+        let routeLayers = {
+            brute_force: null,
+            nearest_neighbor: null,
+            genetic: null
+        };
+        // Colors for different algorithms
+        const colors = {
+            brute_force: 'red',
+            nearest_neighbor: 'blue',
+            genetic: 'green'
+        };
+        // Store original points from .tsv upload
+        let originalPoints = [];
+        // Upload network file
+        async function uploadNetwork() {
+            const fileInput = document.getElementById('networkFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a network file');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch('/upload/network', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert('Network loaded successfully');
+                    document.getElementById('runButton').disabled = !document.getElementById('pointsFile').files[0];
+                } else {
+                    alert('Error: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error uploading network: ' + error);
+            }
+        }
+        // Upload points file
+        async function uploadPoints() {
+            const fileInput = document.getElementById('pointsFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a points file');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch('/upload/points', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert('Points loaded successfully');
+                    document.getElementById('runButton').disabled = !document.getElementById('networkFile').files[0];
+                    // Store original points for route drawing
+                    originalPoints = data.coordinates.map(pt => ({ latitude: pt.latitude, longitude: pt.longitude }));
+                    drawPoints();
+                } else {
+                    alert('Error: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error uploading points: ' + error);
+            }
+        }
+        // Draw points as Leaflet markers
+        function drawPoints() {
+            // Remove old markers
+            pointMarkers.forEach(m => map.removeLayer(m));
+            pointMarkers = [];
+            // Add new markers
+            for (const pt of originalPoints) {
+                const marker = L.circleMarker([pt.latitude, pt.longitude], {
+                    radius: 7,
+                    color: 'red',
+                    fillColor: 'red',
+                    fillOpacity: 0.8,
+                    weight: 2
+                }).addTo(map);
+                pointMarkers.push(marker);
+            }
+            // Optionally fit map to points
+            if (originalPoints.length > 0) {
+                const latlngs = originalPoints.map(pt => [pt.latitude, pt.longitude]);
+                map.fitBounds(latlngs);
+            }
+        }
+        // Run algorithms
+        async function runAlgorithms() {
+            try {
+                const response = await fetch('/run-algorithms', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error running algorithms: ' + error);
+            }
+        }
+        // Draw routes as Leaflet polylines
+        function drawRoutes(results) {
+            // Remove old route layers
+            Object.values(routeLayers).forEach(layer => {
+                if (layer) map.removeLayer(layer);
+            });
+            // Draw new routes
+            for (const [algorithm, result] of Object.entries(results)) {
+                if (result.error) continue;
+                const indices = result.point_indices;
+                if (!indices || indices.length < 2) continue;
+                const latlngs = indices.map(idx => [originalPoints[idx].latitude, originalPoints[idx].longitude]);
+                const color = colors[algorithm] || 'black';
+                const polyline = L.polyline(latlngs, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8
+                });
+                const checkbox = document.getElementById(algorithm + 'Toggle');
+                if (!checkbox || checkbox.checked) {
+                    polyline.addTo(map);
+                }
+                routeLayers[algorithm] = polyline;
+            }
+        }
+        // Toggle route visibility
+        function toggleRoute(algorithm) {
+            const checkbox = document.getElementById(algorithm + 'Toggle');
+            const layer = routeLayers[algorithm];
+            if (layer) {
+                if (checkbox.checked) {
+                    map.addLayer(layer);
+                } else {
+                    map.removeLayer(layer);
+                }
+            }
+        }
+        // Display results
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            // Display brute force results
+            const bruteForceDiv = document.getElementById('bruteForce');
+            bruteForceDiv.innerHTML = `
+                <h3>Brute Force</h3>
+                <p>Distance: ${results.brute_force.distance.toFixed(2)} meters</p>
+                <p>Time: ${results.brute_force.time.toFixed(2)} seconds</p>
+            `;
+            // Display nearest neighbor results
+            const nearestNeighborDiv = document.getElementById('nearestNeighbor');
+            nearestNeighborDiv.innerHTML = `
+                <h3>Nearest Neighbor</h3>
+                <p>Distance: ${results.nearest_neighbor.distance.toFixed(2)} meters</p>
+                <p>Time: ${results.nearest_neighbor.time.toFixed(2)} seconds</p>
+            `;
+            // Display genetic algorithm results
+            const geneticDiv = document.getElementById('genetic');
+            geneticDiv.innerHTML = `
+                <h3>Genetic Algorithm</h3>
+                <p>Distance: ${results.genetic.distance.toFixed(2)} meters</p>
+                <p>Time: ${results.genetic.time.toFixed(2)} seconds</p>
+            `;
+            drawRoutes(results);
+        }
+    </script>
+</body>
+</html> 
