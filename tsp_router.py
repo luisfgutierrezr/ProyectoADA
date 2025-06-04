@@ -88,9 +88,18 @@ class TSPRouter:
         min_path = None
         min_dist = float('inf')
         
-        for path in itertools.permutations(range(n)):
-            # Calcula la distancia total
-            dist = sum(self.distance_matrix[path[i]][path[i+1]] for i in range(n-1))
+        # Generar todas las permutaciones empezando desde el primer punto
+        first_point = 0
+        remaining_points = list(range(1, n))
+        
+        for perm in itertools.permutations(remaining_points):
+            # Construir el camino completo incluyendo el primer punto
+            path = [first_point] + list(perm)
+            
+            # Calcular la distancia total
+            dist = 0
+            for i in range(len(path)-1):
+                dist += self.distance_matrix[path[i]][path[i+1]]
             dist += self.distance_matrix[path[-1]][path[0]]  # Regresar al punto de inicio
             
             if dist < min_dist:
@@ -99,11 +108,24 @@ class TSPRouter:
                 
         end_time = time.time()
         
+        if min_path is None:
+            return {"error": "No valid path found", "path": [], "distance": 0, "time": 0}
+        
         # Construir el camino completo usando los caminos entre puntos
         full_path = []
         for i in range(len(min_path)-1):
-            full_path.extend(self.get_path_between_points(min_path[i], min_path[i+1])[:-1])
-        full_path.extend(self.get_path_between_points(min_path[-1], min_path[0]))
+            path_segment = self.get_path_between_points(min_path[i], min_path[i+1])
+            if path_segment is None:
+                return {"error": f"No path found between points {min_path[i]} and {min_path[i+1]}", 
+                       "path": [], "distance": 0, "time": 0}
+            full_path.extend(path_segment[:-1])  # Exclude last point to avoid duplicates
+        
+        # Add the path back to the start
+        final_segment = self.get_path_between_points(min_path[-1], min_path[0])
+        if final_segment is None:
+            return {"error": f"No path found between points {min_path[-1]} and {min_path[0]}", 
+                   "path": [], "distance": 0, "time": 0}
+        full_path.extend(final_segment)
         
         return {
             "path": full_path,
