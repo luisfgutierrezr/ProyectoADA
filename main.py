@@ -28,6 +28,7 @@ road_network = None
 points = None
 results = {}
 point_index_to_node = []  # Maps original point index to nearest node id
+node_coordinates = {}  # Maps node IDs to their coordinates
 
 # Replace NetworkData with TSPRouter
 router = TSPRouter()
@@ -55,6 +56,11 @@ async def upload_network(file: UploadFile = File(...)):
         # Load and simplify the graph
         G = ox.graph.graph_from_xml(temp_path, simplify=True)
         os.remove(temp_path)
+        
+        # Store node coordinates
+        global node_coordinates
+        node_coordinates = {node: {'lat': data['y'], 'lon': data['x']} 
+                          for node, data in G.nodes(data=True)}
         
         # Store the graph in the router
         router.graph = G
@@ -152,10 +158,15 @@ async def run_algorithms():
         # Add coordinates to paths for visualization
         for algo in results:
             if "error" not in results[algo]:
-                # Map node_id path back to original point indices
-                node_id_to_index = {node_id: idx for idx, node_id in enumerate(point_index_to_node)}
-                point_indices = [node_id_to_index.get(node_id, -1) for node_id in results[algo]["path"]]
-                results[algo]["point_indices"] = point_indices
+                # Convert node IDs to coordinates
+                path_coordinates = []
+                for node_id in results[algo]["path"]:
+                    if node_id in node_coordinates:
+                        path_coordinates.append({
+                            'latitude': node_coordinates[node_id]['lat'],
+                            'longitude': node_coordinates[node_id]['lon']
+                        })
+                results[algo]["path_coordinates"] = path_coordinates
         
         return results
     except Exception as e:
@@ -299,4 +310,4 @@ def mutate(path):
     return path
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

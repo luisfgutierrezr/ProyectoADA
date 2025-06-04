@@ -238,9 +238,9 @@
             // Draw new routes
             for (const [algorithm, result] of Object.entries(results)) {
                 if (result.error) continue;
-                const indices = result.point_indices;
-                if (!indices || indices.length < 2) continue;
-                const latlngs = indices.map(idx => [originalPoints[idx].latitude, originalPoints[idx].longitude]);
+                const path_coordinates = result.path_coordinates;
+                if (!path_coordinates || path_coordinates.length < 2) continue;
+                const latlngs = path_coordinates.map(pt => [pt.latitude, pt.longitude]);
                 const color = colors[algorithm] || 'black';
                 const polyline = L.polyline(latlngs, {
                     color: color,
@@ -248,7 +248,7 @@
                     opacity: 0.8
                 });
                 const checkbox = document.getElementById(algorithm + 'Toggle');
-                if (!checkbox || checkbox.checked) {
+                if (checkbox && checkbox.checked) {
                     polyline.addTo(map);
                 }
                 routeLayers[algorithm] = polyline;

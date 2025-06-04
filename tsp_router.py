@@ -16,6 +16,7 @@ class TSPRouter:
         self.graph = nx.Graph()  # Grafo que almacena nodos y aristas
         self.points = []         # Lista de nodos que representan los puntos a visitar
         self.distance_matrix = None
+        self.path_matrix = None  # Matriz que almacena los caminos entre puntos
 
     def load_graph(self, edges: List[Tuple[int, int, float]]) -> None:
         """
@@ -29,19 +30,26 @@ class TSPRouter:
         Establece la lista de puntos que se deben visitar y calcula la matriz de distancias.
         """
         self.points = points
-        self._calculate_distance_matrix()
+        self._calculate_distance_and_path_matrices()
 
-    def _calculate_distance_matrix(self):
+    def _calculate_distance_and_path_matrices(self):
         """
-        Calcula la matriz de distancias entre todos los puntos usando la longitud de las aristas.
+        Calcula la matriz de distancias y caminos entre todos los puntos usando la longitud de las aristas.
         """
         n = len(self.points)
         self.distance_matrix = np.zeros((n, n))
+        self.path_matrix = [[None for _ in range(n)] for _ in range(n)]
         
         for i in range(n):
             for j in range(i+1, n):
                 try:
                     # Calcula la longitud del camino más corto entre los puntos
+                    path = nx.shortest_path(
+                        self.graph,
+                        source=self.points[i],
+                        target=self.points[j],
+                        weight='length'
+                    )
                     path_length = nx.shortest_path_length(
                         self.graph,
                         source=self.points[i],
@@ -50,21 +58,20 @@ class TSPRouter:
                     )
                     self.distance_matrix[i][j] = path_length
                     self.distance_matrix[j][i] = path_length
+                    self.path_matrix[i][j] = path
+                    self.path_matrix[j][i] = path[::-1]  # Camino inverso
                 except nx.NetworkXNoPath:
                     # Si no existe camino, usa un número grande
                     self.distance_matrix[i][j] = float('inf')
                     self.distance_matrix[j][i] = float('inf')
+                    self.path_matrix[i][j] = None
+                    self.path_matrix[j][i] = None
 
-    def distance(self, u: int, v: int) -> float:
+    def get_path_between_points(self, i: int, j: int) -> List[int]:
         """
-        Calcula la distancia más corta entre dos nodos en el grafo,
-        utilizando el peso de las aristas (e.g., distancia real o tiempo).
+        Retorna el camino entre dos puntos usando la matriz de caminos.
         """
-        try:
-            return nx.shortest_path_length(self.graph, u, v, weight='length')
-        except nx.NetworkXNoPath:
-            print(f"Warning: No path found between nodes {u} and {v}")
-            return float('inf')
+        return self.path_matrix[i][j]
 
     def brute_force_tsp(self) -> Dict[str, Any]:
         """
@@ -92,8 +99,14 @@ class TSPRouter:
                 
         end_time = time.time()
         
+        # Construir el camino completo usando los caminos entre puntos
+        full_path = []
+        for i in range(len(min_path)-1):
+            full_path.extend(self.get_path_between_points(min_path[i], min_path[i+1])[:-1])
+        full_path.extend(self.get_path_between_points(min_path[-1], min_path[0]))
+        
         return {
-            "path": [self.points[i] for i in min_path],
+            "path": full_path,
             "distance": min_dist,
             "time": end_time - start_time
         }
@@ -115,7 +128,7 @@ class TSPRouter:
         unvisited.remove(current)
         
         while unvisited:
-            # Encontrar el nodo más cercano al nodo actual (según distancia más corta en el grafo)
+            # Encontrar el nodo más cercano al nodo actual
             next_point = min(unvisited, key=lambda x: self.distance_matrix[current][x])
             path.append(next_point)
             unvisited.remove(next_point)
@@ -125,20 +138,19 @@ class TSPRouter:
         total_dist = sum(self.distance_matrix[path[i]][path[i+1]] for i in range(n-1))
         total_dist += self.distance_matrix[path[-1]][path[0]]  # Regresar al punto de inicio
         
+        # Construir el camino completo usando los caminos entre puntos
+        full_path = []
+        for i in range(len(path)-1):
+            full_path.extend(self.get_path_between_points(path[i], path[i+1])[:-1])
+        full_path.extend(self.get_path_between_points(path[-1], path[0]))
+        
         end_time = time.time()
         
         return {
-            "path": [self.points[i] for i in path],
+            "path": full_path,
             "distance": total_dist,
             "time": end_time - start_time
         }
-
-    def _route_cost(self, route: List[int]) -> float:
-        """
-        Calcula el costo total de una ruta completa.
-        Suma las distancias entre cada par consecutivo de nodos.
-        """
-        return sum(self.distance_matrix[route[i]][route[i+1]] for i in range(len(route) - 1))
 
     def genetic_algorithm_tsp(self) -> Dict[str, Any]:
         """
@@ -188,10 +200,16 @@ class TSPRouter:
         best_path = min(population, key=self._calculate_path_distance)
         best_distance = self._calculate_path_distance(best_path)
         
+        # Construir el camino completo usando los caminos entre puntos
+        full_path = []
+        for i in range(len(best_path)-1):
+            full_path.extend(self.get_path_between_points(best_path[i], best_path[i+1])[:-1])
+        full_path.extend(self.get_path_between_points(best_path[-1], best_path[0]))
+        
         end_time = time.time()
         
         return {
-            "path": [self.points[i] for i in best_path],
+            "path": full_path,
             "distance": best_distance,
             "time": end_time - start_time
         }
