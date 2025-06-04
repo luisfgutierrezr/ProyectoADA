@@ -134,11 +134,19 @@ class TSPRunner:
         # Set up the TSP router with the graph and points
         self.tsp_router.graph = self.graph.copy(as_view=False)  # Create a deep copy of the graph
         self.tsp_router.points = self.points.copy()  # Create a copy of the points
+        
+        # Calculate distance matrix before running algorithms
+        self.tsp_router._calculate_distance_and_path_matrices()
 
-        # Run algorithms
-        results = {
-            "nearest_neighbor": self.tsp_router.nearest_neighbor()
-        }
+        results = {}
+        
+        # Run nearest neighbor algorithm
+        print("\nRunning nearest neighbor algorithm...")
+        results["nearest_neighbor"] = self.tsp_router.nearest_neighbor()
+        
+        # Run genetic algorithm
+        print("\nRunning genetic algorithm...")
+        results["genetic"] = self.tsp_router.genetic_algorithm_tsp()
 
         # Only run brute force for small numbers of points (n <= 10)
         if len(self.points) <= 10:
@@ -166,8 +174,8 @@ def main():
     for algo, result in results.items():
         print(f"\n{algo.upper()} Results:")
         print(f"Path: {' -> '.join(str(node) for node in result['path'])}")
-        print(f"Cost: {result['cost']:.2f}")
+        print(f"Distance: {result['distance']:.2f} meters")  # Using distance instead of cost
         print(f"Time: {result['time']:.4f} seconds")
 
 if __name__ == "__main__":
-    main() 
+    main()

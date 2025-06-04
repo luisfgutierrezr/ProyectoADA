@@ -33,7 +33,7 @@ node_coordinates = {}  # Maps node IDs to their coordinates
 router = TSPRouter()
 
 # Maximum points for brute force
-MAX_BRUTE_FORCE_POINTS = 10
+MAX_BRUTE_FORCE_POINTS = 15
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -136,9 +136,13 @@ async def run_algorithms():
     try:
         # Check if we have too many points for brute force
         if len(router.points) > MAX_BRUTE_FORCE_POINTS:
+            print(f"[DEBUG] Antes de nearest_neighbor, router.points = {router.points}")
+            nn_result = router.nearest_neighbor()
+            print(f"[DEBUG] Antes de genetic, router.points = {router.points}")
+            gen_result = router.genetic_algorithm_tsp()
             results = {
-                "nearest_neighbor": router.nearest_neighbor(),
-                "genetic": router.genetic_algorithm_tsp()
+                "nearest_neighbor": nn_result,
+                "genetic": gen_result
             }
             results["brute_force"] = {
                 "error": f"Too many points for brute force (max {MAX_BRUTE_FORCE_POINTS})",
@@ -147,24 +151,33 @@ async def run_algorithms():
                 "time": 0
             }
         else:
+            print(f"[DEBUG] Antes de brute_force, router.points = {router.points}")
+            brute_result = router.brute_force_tsp()
+            print(f"[DEBUG] Antes de nearest_neighbor, router.points = {router.points}")
+            nn_result = router.nearest_neighbor()
+            print(f"[DEBUG] Antes de genetic, router.points = {router.points}")
+            gen_result = router.genetic_algorithm_tsp()
             results = {
-                "brute_force": router.brute_force_tsp(),
-                "nearest_neighbor": router.nearest_neighbor(),
-                "genetic": router.genetic_algorithm_tsp()
+                "brute_force": brute_result,
+                "nearest_neighbor": nn_result,
+                "genetic": gen_result
             }
             
         # Add coordinates to paths for visualization
         for algo in results:
-            if "error" not in results[algo]:
-                # Convert node IDs to coordinates
-                path_coordinates = []
-                for node_id in results[algo]["path"]:
-                    if node_id in node_coordinates:
-                        path_coordinates.append({
-                            'latitude': node_coordinates[node_id]['lat'],
-                            'longitude': node_coordinates[node_id]['lon']
-                        })
-                results[algo]["path_coordinates"] = path_coordinates
+            print(f"Algoritmo: {algo}")
+            print(f"Path (IDs): {results[algo]['path']}")
+            print(f"Node coordinates keys: {list(node_coordinates.keys())[:10]} ... (total: {len(node_coordinates)})")
+            # Convert node IDs to coordinates
+            path_coordinates = []
+            for node_id in results[algo]["path"]:
+                if node_id in node_coordinates:
+                    path_coordinates.append({
+                        'latitude': node_coordinates[node_id]['lat'],
+                        'longitude': node_coordinates[node_id]['lon']
+                    })
+            print(f"Path coordinates: {path_coordinates[:5]} ... (total: {len(path_coordinates)})")
+            results[algo]["path_coordinates"] = path_coordinates
         
         return results
     except Exception as e:

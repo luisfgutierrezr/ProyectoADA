@@ -79,38 +79,31 @@ class TSPRouter:
         Solo recomendable para pocas ubicaciones (<10), ya que la complejidad es factorial.
         """
         start_time = time.time()
-        
         n = len(self.points)
+        print(f"[DEBUG] brute_force_tsp: n = {n}, points = {self.points}")
         if n == 0:
             return {"error": "No points to visit", "path": [], "distance": 0, "time": 0}
-            
         # Genera todas las permutaciones posibles del conjunto de puntos
         min_path = None
         min_dist = float('inf')
-        
         # Generar todas las permutaciones empezando desde el primer punto
         first_point = 0
         remaining_points = list(range(1, n))
-        
         for perm in itertools.permutations(remaining_points):
+            print(f"[DEBUG] brute_force_tsp: trying permutation {perm}")
             # Construir el camino completo incluyendo el primer punto
             path = [first_point] + list(perm)
-            
             # Calcular la distancia total
             dist = 0
             for i in range(len(path)-1):
                 dist += self.distance_matrix[path[i]][path[i+1]]
             dist += self.distance_matrix[path[-1]][path[0]]  # Regresar al punto de inicio
-            
             if dist < min_dist:
                 min_dist = dist
                 min_path = path
-                
         end_time = time.time()
-        
         if min_path is None:
             return {"error": "No valid path found", "path": [], "distance": 0, "time": 0}
-        
         # Construir el camino completo usando los caminos entre puntos
         full_path = []
         for i in range(len(min_path)-1):
@@ -119,14 +112,12 @@ class TSPRouter:
                 return {"error": f"No path found between points {min_path[i]} and {min_path[i+1]}", 
                        "path": [], "distance": 0, "time": 0}
             full_path.extend(path_segment[:-1])  # Exclude last point to avoid duplicates
-        
         # Add the path back to the start
         final_segment = self.get_path_between_points(min_path[-1], min_path[0])
         if final_segment is None:
             return {"error": f"No path found between points {min_path[-1]} and {min_path[0]}", 
                    "path": [], "distance": 0, "time": 0}
         full_path.extend(final_segment)
-        
         return {
             "path": full_path,
             "distance": min_dist,
@@ -179,57 +170,52 @@ class TSPRouter:
         Resuelve el TSP usando un algoritmo genético.
         """
         start_time = time.time()
-        
         n = len(self.points)
         if n == 0:
             return {"error": "No points to visit", "path": [], "distance": 0, "time": 0}
-            
-        # Parámetros del algoritmo genético
-        population_size = 50
-        generations = 100
+        # Parámetros mejorados del algoritmo genético
+        population_size = 200
+        generations = 300
         mutation_rate = 0.1
-        
         # Inicializar población
         population = [list(np.random.permutation(n)) for _ in range(population_size)]
-        
         for _ in range(generations):
-            # Calcular fitness
+            # Calcular fitness penalizando rutas imposibles
             fitness = [self._calculate_path_distance(p) for p in population]
-            
+            # Penalizar rutas imposibles (distancia infinita)
+            fitness = [f if np.isfinite(f) else 1e12 for f in fitness]
             # Seleccionar padres
             parents = []
             for _ in range(population_size):
                 tournament = np.random.choice(population_size, 3, replace=False)
                 winner = min(tournament, key=lambda x: fitness[x])
                 parents.append(population[winner])
-                
             # Crear nueva generación
             new_population = []
             for i in range(0, population_size, 2):
                 parent1, parent2 = parents[i], parents[i+1]
                 child1, child2 = self._crossover(parent1, parent2)
-                
                 if np.random.random() < mutation_rate:
                     child1 = self._mutate(child1)
                 if np.random.random() < mutation_rate:
                     child2 = self._mutate(child2)
-                    
                 new_population.extend([child1, child2])
-                
             population = new_population
-            
         # Obtener mejor solución
         best_path = min(population, key=self._calculate_path_distance)
         best_distance = self._calculate_path_distance(best_path)
-        
+        print(f"[DEBUG] genetic best_path: {best_path}")
+        print(f"[DEBUG] genetic best_distance: {best_distance}")
+        print(f"[DEBUG] path length: {len(best_path)} (should be igual a n)")
+        print(f"[DEBUG] unique nodes in path: {len(set(best_path))}")
+        if not np.isfinite(best_distance):
+            print("[WARNING] La mejor ruta encontrada por el genético es inválida (distancia infinita). Puede que la red no esté completamente conectada entre los puntos.")
         # Construir el camino completo usando los caminos entre puntos
         full_path = []
         for i in range(len(best_path)-1):
             full_path.extend(self.get_path_between_points(best_path[i], best_path[i+1])[:-1])
         full_path.extend(self.get_path_between_points(best_path[-1], best_path[0]))
-        
         end_time = time.time()
-        
         return {
             "path": full_path,
             "distance": best_distance,
