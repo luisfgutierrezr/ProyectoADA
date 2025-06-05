@@ -129,8 +129,7 @@ class TSPRouter:
         Resuelve el TSP usando el algoritmo del vecino más cercano.
         Comienza desde un nodo inicial y siempre se mueve al nodo más cercano no visitado.
         """
-        start_time = time.time()
-        
+        start_time = time.perf_counter()
         n = len(self.points)
         if n == 0:
             return {"error": "No points to visit", "path": [], "distance": 0, "time": 0}
@@ -157,7 +156,7 @@ class TSPRouter:
             full_path.extend(self.get_path_between_points(path[i], path[i+1])[:-1])
         full_path.extend(self.get_path_between_points(path[-1], path[0]))
         
-        end_time = time.time()
+        end_time = time.perf_counter()
         
         return {
             "path": full_path,
@@ -169,7 +168,7 @@ class TSPRouter:
         """
         Resuelve el TSP usando un algoritmo genético.
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
         n = len(self.points)
         if n == 0:
             return {"error": "No points to visit", "path": [], "distance": 0, "time": 0}
@@ -215,7 +214,7 @@ class TSPRouter:
         for i in range(len(best_path)-1):
             full_path.extend(self.get_path_between_points(best_path[i], best_path[i+1])[:-1])
         full_path.extend(self.get_path_between_points(best_path[-1], best_path[0]))
-        end_time = time.time()
+        end_time = time.perf_counter()
         return {
             "path": full_path,
             "distance": best_distance,

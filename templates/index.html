@@ -275,21 +275,21 @@
             bruteForceDiv.innerHTML = `
                 <h3>Brute Force</h3>
                 <p>Distance: ${results.brute_force.distance.toFixed(2)} meters</p>
-                <p>Time: ${results.brute_force.time.toFixed(2)} seconds</p>
+                <p>Time: ${results.brute_force.time.toFixed(6)} seconds</p>
             `;
             // Display nearest neighbor results
             const nearestNeighborDiv = document.getElementById('nearestNeighbor');
             nearestNeighborDiv.innerHTML = `
                 <h3>Nearest Neighbor</h3>
                 <p>Distance: ${results.nearest_neighbor.distance.toFixed(2)} meters</p>
-                <p>Time: ${results.nearest_neighbor.time.toFixed(2)} seconds</p>
+                <p>Time: ${results.nearest_neighbor.time.toFixed(6)} seconds</p>
             `;
             // Display genetic algorithm results
             const geneticDiv = document.getElementById('genetic');
             geneticDiv.innerHTML = `
                 <h3>Genetic Algorithm</h3>
                 <p>Distance: ${results.genetic.distance.toFixed(2)} meters</p>
-                <p>Time: ${results.genetic.time.toFixed(2)} seconds</p>
+                <p>Time: ${results.genetic.time.toFixed(6)} seconds</p>
             `;
             drawRoutes(results);
         }
